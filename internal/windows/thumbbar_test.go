@@ -75,49 +75,52 @@ func TestThumbBarState(t *testing.T) {
 
 	w := &window{b: &Backend{taskbarFailed: true}, skipTaskbar: true}
 
-	// Even with skipTaskbar, a bad first PNG must fail and leave defined
-	// false.
-	if err := w.SetThumbBar([]platform.ThumbButton{{ID: 0, Icon: []byte("bad")}}); err == nil {
+	// Even with skipTaskbar, a bad first PNG must fail and keep nothing.
+	if err := w.setThumbBar([]platform.ThumbButton{{Icon: []byte("bad")}}); err == nil {
 		t.Fatal("SetThumbBar accepted invalid PNG while skipTaskbar is true")
 	}
-	if w.thumb.defined {
-		t.Fatal("defined should stay false after failed initial SetThumbBar")
+	if len(w.thumb.buttons) != 0 {
+		t.Fatal("buttons kept after failed initial SetThumbBar")
 	}
 
-	if err := w.SetThumbBar([]platform.ThumbButton{
-		{ID: 0, Icon: red, ToolTip: "Play"},
-		{ID: 1, Icon: blue, ToolTip: "Next"},
+	if err := w.setThumbBar([]platform.ThumbButton{
+		{Icon: red, ToolTip: "Play"},
+		{Icon: blue, ToolTip: "Next"},
 	}); err != nil {
 		t.Fatalf("initial SetThumbBar: %v", err)
 	}
 
-	// Update button 0 with no icon, replacing only button 1's icon.
-	if err := w.SetThumbBar([]platform.ThumbButton{
-		{ID: 0, ToolTip: "Play!"},
-		{ID: 1, Icon: green, ToolTip: "Skip", Disabled: true},
+	// Update with button 0's icon unchanged, replacing only button 1's.
+	if err := w.setThumbBar([]platform.ThumbButton{
+		{Icon: red, ToolTip: "Play!"},
+		{Icon: green, ToolTip: "Skip", Disabled: true},
 	}); err != nil {
 		t.Fatalf("update SetThumbBar: %v", err)
 	}
-	if !bytes.Equal(w.thumb.buttons[0].Icon, red) {
-		t.Fatal("button 0 lost its saved PNG after nil-icon update")
+	if !bytes.Equal(w.thumb.buttons[0].Icon, red) || !bytes.Equal(w.thumb.buttons[1].Icon, green) {
+		t.Fatal("the update did not keep the PNGs")
 	}
-	if !bytes.Equal(w.thumb.buttons[1].Icon, green) {
-		t.Fatal("button 1 did not save replacement PNG")
-	}
-	// The rebuild path (TaskbarButtonCreated / SetSkipTaskbar(false)) builds
-	// every HICON from the cached PNGs.
-	icons, err := w.makeThumbIcons(w.thumb.buttons, true)
+	// Only the icons that differ from the shell's are built.
+	shell := []platform.ThumbButton{{Icon: red}, {Icon: blue}}
+	icons, err := w.makeThumbIcons(w.thumb.buttons, shell)
 	if err != nil {
-		t.Fatalf("rebuild makeThumbIcons: %v", err)
+		t.Fatalf("makeThumbIcons: %v", err)
+	}
+	if len(icons) != 2 || icons[0] != 0 || icons[1] == 0 {
+		t.Fatalf("icons = %v, want only button 1's", icons)
 	}
 	destroyIcons(icons)
 
-	// A bad replacement PNG fails without mutating the cached buttons.
-	if err := w.SetThumbBar([]platform.ThumbButton{
-		{ID: 0, Icon: []byte("corrupt"), ToolTip: "Broken"},
-		{ID: 1, ToolTip: "Skip"},
+	// A bad replacement PNG fails without mutating the cached buttons, and
+	// so does a different count.
+	if err := w.setThumbBar([]platform.ThumbButton{
+		{Icon: []byte("corrupt"), ToolTip: "Broken"},
+		{Icon: green, ToolTip: "Skip"},
 	}); err == nil {
 		t.Fatal("update SetThumbBar accepted invalid replacement PNG")
+	}
+	if err := w.setThumbBar([]platform.ThumbButton{{Icon: red}}); err == nil {
+		t.Fatal("update SetThumbBar accepted a different count")
 	}
 	if w.thumb.buttons[0].ToolTip != "Play!" || !bytes.Equal(w.thumb.buttons[0].Icon, red) {
 		t.Fatalf("failed update mutated cached button 0: %+v", w.thumb.buttons[0])

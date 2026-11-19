@@ -81,11 +81,14 @@ type window struct {
 	}
 	icons [2]uintptr // small and big, from SetIcon
 	// thumb is the window's thumbnail toolbar (thumbbar.go): the buttons
-	// the core set last.
+	// the core set last, and whether the shell has them (live).
 	thumb struct {
 		buttons []platform.ThumbButton
-		defined bool
+		live    bool
 	}
+	// taskbarButton is whether Explorer has sent TaskbarButtonCreated for
+	// the window's current taskbar button.
+	taskbarButton bool
 	// placing is the rectangle, in pixels, that place is moving the window
 	// to, already in the DPI of its display: WM_DPICHANGED keeps it.
 	placing *rect
@@ -494,6 +497,7 @@ func (w *window) monitor() uintptr {
 // message handles a window message; ok false lets DefWindowProc run.
 func (w *window) message(m uint32, wp, lp uintptr) (uintptr, bool) {
 	if m == w.b.taskbarButtonCreated && m != 0 {
+		w.taskbarButton = true
 		w.applyTaskbar()
 		return 0, true
 	}

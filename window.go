@@ -1,7 +1,6 @@
 package mygo
 
 import (
-	"bytes"
 	"cmp"
 	"context"
 	"errors"
@@ -1574,7 +1573,7 @@ type ThumbButton struct {
 //	})
 //
 // The first call fixes the buttons' count and order; later calls update
-// their icons (passing new PNGs, or nil / the same PNGs to keep them),
+// their icons (passing new PNGs, or nil to keep them),
 // tooltips, Disabled and Hidden state, and replace their Click functions.
 // The toolbar takes one to 7 buttons, and a later call that changes their
 // number fails with an error. A button's Click runs on the main thread.
@@ -1601,28 +1600,21 @@ func (w *Window) SetThumbBar(buttons []ThumbButton) error {
 			err = errors.New("mygo: the buttons of a thumbnail toolbar cannot change once they are set")
 			return
 		}
-		// The shell reports a click by the button's position, which stays
-		// its id for the toolbar's life.
+		// The shell reports a click by the button's position.
 		updated := make([]ThumbButton, len(buttons))
 		native := make([]platform.ThumbButton, len(buttons))
 		for i, b := range buttons {
-			var sendIcon []byte
-			if !updating {
-				if len(b.Icon) == 0 {
-					err = errors.New("mygo: a thumbnail toolbar button needs an icon")
-					return
-				}
+			switch {
+			case len(b.Icon) > 0:
 				b.Icon = slices.Clone(b.Icon)
-				sendIcon = b.Icon
-			} else if len(b.Icon) == 0 || bytes.Equal(b.Icon, w.thumbBar[i].Icon) {
-				// Keep the saved PNG and send nil to skip rebuilding the HICON.
+			case updating:
 				b.Icon = w.thumbBar[i].Icon
-			} else {
-				b.Icon = slices.Clone(b.Icon)
-				sendIcon = b.Icon
+			default:
+				err = errors.New("mygo: a thumbnail toolbar button needs an icon")
+				return
 			}
 			updated[i] = b
-			native[i] = platform.ThumbButton{ID: i, Icon: sendIcon, ToolTip: b.ToolTip,
+			native[i] = platform.ThumbButton{Icon: b.Icon, ToolTip: b.ToolTip,
 				Disabled: b.Disabled, Hidden: b.Hidden}
 		}
 		if err = tb.SetThumbBar(native); err == nil {

@@ -100,10 +100,19 @@ func (w *window) SetSkipTaskbar(v bool) {
 		return
 	}
 	w.skipTaskbar = v
-	if tl := w.b.taskbar(); tl != 0 && !v {
-		comCall(tl, tbAddTab, w.hwnd)
+	tl := w.b.taskbar()
+	if tl == 0 {
+		return
 	}
-	w.applyTaskbar()
+	if v {
+		comCall(tl, tbDeleteTab, w.hwnd)
+		// The button is gone, and with it the toolbar: a new one gets
+		// both again on TaskbarButtonCreated.
+		w.taskbarButton, w.thumb.live = false, false
+		return
+	}
+	comCall(tl, tbAddTab, w.hwnd)
+	w.applyProgress(tl)
 }
 
 func (w *window) FlashFrame(flash bool) {

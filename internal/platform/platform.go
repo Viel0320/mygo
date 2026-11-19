@@ -158,11 +158,10 @@ type InputRegionWindow interface {
 }
 
 // ThumbButton is a button of a thumbnail toolbar (ThumbBarWindow): the core
-// resolves the buttons of the public SetThumbBar into these, ID being the
-// button's position, which the shell reports back on a click. On updates,
-// an empty Icon tells the backend to keep the button's existing icon.
+// resolves the buttons of the public SetThumbBar into these, in the order
+// the shell reports a click by (the button's index). Icon is always the
+// button's PNG; the backend compares it with the one it has.
 type ThumbButton struct {
-	ID       int
 	Icon     []byte
 	ToolTip  string
 	Disabled bool

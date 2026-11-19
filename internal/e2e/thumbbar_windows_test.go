@@ -9,7 +9,6 @@ import (
 	"image/draw"
 	"image/png"
 	"testing"
-	"time"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/internal/wait"
@@ -49,6 +48,14 @@ func TestThumbBar(t *testing.T) {
 	}
 	w.Show()
 	eventually(t, "the window shown", w.IsVisible)
+	live := func() bool {
+		var ok bool
+		mygo.RunOnMain(func() { ok = win.TestThumbBarLive(w.NativeHandle()) })
+		return ok
+	}
+	// The shell takes the toolbar once the taskbar button exists; from then
+	// on SetThumbBar returns the HRESULT of ThumbBarUpdateButtons.
+	eventually(t, "the shell has the toolbar", live)
 
 	// A later call updates tooltips, state, icons and Click functions; nil
 	// keeps the existing icon, and passing a new PNG replaces it.
@@ -59,17 +66,26 @@ func TestThumbBar(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SetThumbBar again: %v", err)
 	}
-	// Passing the original icon again, recreating the taskbar button and
-	// updating progress all still work.
+	// Passing the original icon again works too.
 	if err := w.SetThumbBar([]mygo.ThumbButton{
 		{Icon: firstIcon, ToolTip: "First!", Click: click(10)},
 		{Disabled: true, Click: click(11)},
 	}); err != nil {
 		t.Fatalf("SetThumbBar with original icon again: %v", err)
 	}
+
+	// A skipped window loses its taskbar button, and a restored one gets the
+	// toolbar again when Explorer reports the new button.
 	w.SetSkipTaskbar(true)
 	w.SetSkipTaskbar(false)
+	eventually(t, "the shell has the toolbar again", live)
 	w.SetProgressBar(mygo.ProgressBar{State: mygo.ProgressNormal, Value: 0.5})
+	if err := w.SetThumbBar([]mygo.ThumbButton{
+		{ToolTip: "First!!", Click: click(10)},
+		{Disabled: true, Click: click(11)},
+	}); err != nil {
+		t.Fatalf("SetThumbBar after the taskbar button came back: %v", err)
+	}
 
 	// The button count is fixed once set, and a bad replacement icon fails.
 	if err := w.SetThumbBar([]mygo.ThumbButton{{ToolTip: "One"}}); err == nil {
@@ -87,13 +103,12 @@ func TestThumbBar(t *testing.T) {
 	if i := wait.For(t, "the button's click", clicks); i != 10 {
 		t.Errorf("the click ran Click of button %d, want 10", i)
 	}
-	// A button the toolbar does not have runs nothing: the shell keeps its
-	// size in step with the core's. The click reaches the main thread after
-	// the posted WM_COMMAND, so give it time to get there.
+	// A button the toolbar does not have runs nothing. Messages arrive in
+	// order, so the click of a valid button after it shows the bad one ran
+	// nothing.
 	win.TestThumbButtonClicked(w.NativeHandle(), 2)
-	select {
-	case i := <-clicks:
-		t.Errorf("a click ran Click of button %d", i)
-	case <-time.After(300 * time.Millisecond):
+	win.TestThumbButtonClicked(w.NativeHandle(), 1)
+	if i := wait.For(t, "the second button's click", clicks); i != 11 {
+		t.Errorf("the clicks ran Click of button %d, want 11 alone", i)
 	}
 }

@@ -37,7 +37,7 @@ func TestThumbBar(t *testing.T) {
 		t.Fatalf("SetThumbBar: %v", err)
 	}
 	if got := onMainValue(func() []platform.ThumbButton { return fw.ThumbBar }); len(got) != 2 ||
-		got[0].ID != 0 || !bytes.Equal(got[0].Icon, icon) || got[1].ID != 1 || !bytes.Equal(got[1].Icon, other) || got[1].ToolTip != "Stop" || !got[1].Disabled {
+		!bytes.Equal(got[0].Icon, icon) || !bytes.Equal(got[1].Icon, other) || got[1].ToolTip != "Stop" || !got[1].Disabled {
 		t.Errorf("fake toolbar = %+v", got)
 	}
 
@@ -52,9 +52,7 @@ func TestThumbBar(t *testing.T) {
 		t.Errorf("Click reported button %d", i)
 	}
 
-	// Later calls send nil for a nil or unchanged icon (skipping HICON
-	// rebuild) while the core keeps the saved PNG; a new icon is cloned and
-	// sent.
+	// Later calls fill a nil icon with the saved PNG; a new icon is cloned.
 	changed := append([]byte(nil), third...)
 	if err := w.SetThumbBar([]ThumbButton{
 		{ToolTip: "KeepNil"},
@@ -63,22 +61,12 @@ func TestThumbBar(t *testing.T) {
 		t.Fatalf("SetThumbBar again: %v", err)
 	}
 	changed[0] = 'X'
-	if got := onMainValue(func() []platform.ThumbButton { return fw.ThumbBar }); got[0].Icon != nil ||
+	if got := onMainValue(func() []platform.ThumbButton { return fw.ThumbBar }); !bytes.Equal(got[0].Icon, icon) ||
 		!bytes.Equal(got[1].Icon, third) || got[1].ToolTip != "Go" || got[1].Disabled {
 		t.Errorf("updated toolbar = %+v", got)
 	}
 	if saved := onMainValue(func() []ThumbButton { return w.thumbBar }); !bytes.Equal(saved[0].Icon, icon) || !bytes.Equal(saved[1].Icon, third) {
 		t.Errorf("core saved icons = %q, %q", saved[0].Icon, saved[1].Icon)
-	}
-	// Passing the original bytes again also sends nil to the backend.
-	if err := w.SetThumbBar([]ThumbButton{
-		{Icon: icon, ToolTip: "SameIcon"},
-		{Icon: third, ToolTip: "Go", Click: button().Click},
-	}); err != nil {
-		t.Fatalf("SetThumbBar same icon: %v", err)
-	}
-	if got := onMainValue(func() []platform.ThumbButton { return fw.ThumbBar }); got[0].Icon != nil || got[1].Icon != nil {
-		t.Errorf("unchanged icons resent to backend: %+v", got)
 	}
 
 	// With no Click set or an out-of-range id, no click should run.
