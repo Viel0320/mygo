@@ -395,9 +395,10 @@ class SurfaceWindow(context: Context, id: Long) : HostWindow(context, id) {
             val handled = KeyReply(r).handled
             // Keys typing text type it, which the content takes as text,
             // whatever Go answered: its text inputs take a printable key
-            // as handled, as the text comes after it, as on macOS. Those
-            // with Control or Meta are shortcuts.
-            if (down && editing && text.isNotEmpty() && keyNames[code] == null && !e.isCtrlPressed && !e.isMetaPressed) {
+            // as handled, as the text comes after it, as on macOS. Space
+            // types too; keys with Control or Meta are shortcuts.
+            if (down && editing && text.isNotEmpty() && (keyNames[code] == null || code == KeyEvent.KEYCODE_SPACE) &&
+                !e.isCtrlPressed && !e.isMetaPressed) {
                 edit(Event.textReplace(wid, false, 0, 0, text))
                 return true
             }
