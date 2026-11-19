@@ -80,6 +80,12 @@ type window struct {
 		value float64
 	}
 	icons [2]uintptr // small and big, from SetIcon
+	// thumb is the window's thumbnail toolbar (thumbbar.go): the buttons
+	// the core set last.
+	thumb struct {
+		buttons []platform.ThumbButton
+		defined bool
+	}
 	// placing is the rectangle, in pixels, that place is moving the window
 	// to, already in the DPI of its display: WM_DPICHANGED keeps it.
 	placing *rect
@@ -645,6 +651,12 @@ func (w *window) message(m uint32, wp, lp uintptr) (uintptr, bool) {
 		}
 		return 0, false
 	case wmCommand:
+		if hiword(wp) == thbnClicked && lp == 0 { // a thumbnail toolbar button
+			if thumbClicked != nil {
+				thumbClicked(w, loword(wp))
+			}
+			return 0, true
+		}
 		if hiword(wp) == 0 && lp == 0 { // a menu item
 			w.b.menuCommand(loword(wp), w)
 			return 0, true

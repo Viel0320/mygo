@@ -990,3 +990,9 @@ func TestBackgroundThrottlingOff(hwnd uintptr, webView bool) (off bool, settings
 	}
 	return theBackend.envUnthrottled, 1
 }
+
+// TestThumbButtonClicked posts the WM_COMMAND the shell sends when the
+// user clicks a thumbnail toolbar button, with the button's id.
+func TestThumbButtonClicked(hwnd uintptr, id int) {
+	procPostMessageW.Call(hwnd, wmCommand, uintptr(uint16(id))|uintptr(thbnClicked)<<16, 0)
+}
